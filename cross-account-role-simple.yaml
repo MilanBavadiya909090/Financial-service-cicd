@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Cross-account deployment role for CI/CD pipeline'
+
+Parameters:
+  CICDAccountId:
+    Type: String
+    Default: '455861466554'
+    Description: CI/CD Pipeline Account ID
+  
+  Environment:
+    Type: String
+    AllowedValues: [dev, test]
+    Description: Environment name
+
+Resources:
+  CrossAccountDeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'CrossAccountDeploymentRole-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: 
+                - !Sub 'arn:aws:iam::${CICDAccountId}:root'
+                - !Sub 'arn:aws:iam::${CICDAccountId}:role/financial-app-codepipeline-role'
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/PowerUserAccess
+      Policies:
+        - PolicyName: CloudFormationFullAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:*
+                  - iam:*
+                  - sts:AssumeRole
+                Resource: '*'
+      Tags:
+        - Key: Purpose
+          Value: CrossAccountDeployment
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  CrossAccountRoleArn:
+    Description: ARN of the cross-account deployment role
+    Value: !GetAtt CrossAccountDeploymentRole.Arn
+    Export:
+      Name: !Sub 'CrossAccountDeploymentRole-${Environment}-Arn'

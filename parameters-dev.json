@@ -1,0 +1,70 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "ProjectName",
+    "ParameterValue": "financial-app"
+  },
+  {
+    "ParameterKey": "VpcCidr",
+    "ParameterValue": "10.0.0.0/16"
+  },
+  {
+    "ParameterKey": "PublicSubnet1Cidr",
+    "ParameterValue": "10.0.1.0/24"
+  },
+  {
+    "ParameterKey": "PublicSubnet2Cidr",
+    "ParameterValue": "10.0.2.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnet1Cidr",
+    "ParameterValue": "10.0.3.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnet2Cidr",
+    "ParameterValue": "10.0.4.0/24"
+  },
+  {
+    "ParameterKey": "BastionAllowedCidr",
+    "ParameterValue": "15.248.0.199/32"
+  },
+  {
+    "ParameterKey": "DatabaseUsername",
+    "ParameterValue": "admin"
+  },
+  {
+    "ParameterKey": "DatabasePassword",
+    "ParameterValue": "DevPassword123!"
+  },
+  {
+    "ParameterKey": "DatabaseName",
+    "ParameterValue": "financial_app"
+  },
+  {
+    "ParameterKey": "DatabaseInstanceClass",
+    "ParameterValue": "db.serverless"
+  },
+  {
+    "ParameterKey": "ECSTaskCpu",
+    "ParameterValue": "256"
+  },
+  {
+    "ParameterKey": "ECSTaskMemory",
+    "ParameterValue": "512"
+  },
+  {
+    "ParameterKey": "FrontendImage",
+    "ParameterValue": "586794441541.dkr.ecr.us-east-1.amazonaws.com/financial-app-frontend:latest"
+  },
+  {
+    "ParameterKey": "BackendImage",
+    "ParameterValue": "586794441541.dkr.ecr.us-east-1.amazonaws.com/financial-app-backend:latest"
+  },
+  {
+    "ParameterKey": "KeyPairName",
+    "ParameterValue": "common"
+  }
+]

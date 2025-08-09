@@ -1,0 +1,208 @@
+{
+  "pipeline": {
+    "name": "financial-app-deployment-pipeline",
+    "roleArn": "arn:aws:iam::455861466554:role/financial-app-codepipeline-role",
+    "artifactStore": {
+      "type": "S3",
+      "location": "financial-app-pipeline-artifacts-455861466554"
+    },
+    "stages": [
+      {
+        "name": "Source",
+        "actions": [
+          {
+            "name": "SourceAction",
+            "actionTypeId": {
+              "category": "Source",
+              "owner": "AWS",
+              "provider": "S3",
+              "version": "1"
+            },
+            "configuration": {
+              "S3Bucket": "financial-app-cicd-templates-455861466554",
+              "S3ObjectKey": "templates/financial-app-infrastructure.yaml",
+              "PollForSourceChanges": "false"
+            },
+            "outputArtifacts": [
+              {
+                "name": "SourceOutput"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Validate",
+        "actions": [
+          {
+            "name": "ValidateTemplate",
+            "actionTypeId": {
+              "category": "Build",
+              "owner": "AWS",
+              "provider": "CodeBuild",
+              "version": "1"
+            },
+            "configuration": {
+              "ProjectName": "financial-app-template-validation"
+            },
+            "inputArtifacts": [
+              {
+                "name": "SourceOutput"
+              }
+            ],
+            "outputArtifacts": [
+              {
+                "name": "ValidatedOutput"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ApprovalForDev",
+        "actions": [
+          {
+            "name": "ApproveDevDeployment",
+            "actionTypeId": {
+              "category": "Approval",
+              "owner": "AWS",
+              "provider": "Manual",
+              "version": "1"
+            },
+            "configuration": {
+              "CustomData": "Template validation completed successfully. Please review the CFN Lint and CFN Nag reports in S3 bucket 'financial-app-cicd-templates-455861466554/reports/' and approve deployment to DEV environment."
+            }
+          }
+        ]
+      },
+      {
+        "name": "DeployToDev",
+        "actions": [
+          {
+            "name": "CreateDevChangeSet",
+            "actionTypeId": {
+              "category": "Deploy",
+              "owner": "AWS",
+              "provider": "CloudFormation",
+              "version": "1"
+            },
+            "configuration": {
+              "ActionMode": "CHANGE_SET_REPLACE",
+              "StackName": "financial-app-dev-infrastructure",
+              "ChangeSetName": "financial-app-dev-changeset",
+              "TemplatePath": "ValidatedOutput::financial-app-infrastructure.yaml",
+              "ParameterOverrides": "{\"Environment\": \"dev\", \"ProjectName\": \"financial-app\", \"VpcCidr\": \"10.0.0.0/16\", \"PublicSubnet1Cidr\": \"10.0.1.0/24\", \"PublicSubnet2Cidr\": \"10.0.2.0/24\", \"PrivateSubnet1Cidr\": \"10.0.3.0/24\", \"PrivateSubnet2Cidr\": \"10.0.4.0/24\", \"BastionAllowedCidr\": \"15.248.0.199/32\", \"DatabaseUsername\": \"admin\", \"DatabasePassword\": \"DevPassword123!\", \"DatabaseName\": \"financial_app\", \"DatabaseInstanceClass\": \"db.serverless\", \"ECSTaskCpu\": \"256\", \"ECSTaskMemory\": \"512\", \"FrontendImage\": \"177652208709.dkr.ecr.us-east-1.amazonaws.com/financial-app-frontend:latest\", \"BackendImage\": \"177652208709.dkr.ecr.us-east-1.amazonaws.com/financial-app-backend:latest\", \"KeyPairName\": \"common\"}",
+              "Capabilities": "CAPABILITY_NAMED_IAM",
+              "RoleArn": "arn:aws:iam::177652208709:role/CrossAccountDeploymentRole-dev"
+            },
+            "inputArtifacts": [
+              {
+                "name": "ValidatedOutput"
+              }
+            ],
+            "roleArn": "arn:aws:iam::177652208709:role/CrossAccountDeploymentRole-dev",
+            "region": "us-east-1"
+          },
+          {
+            "name": "ExecuteDevChangeSet",
+            "actionTypeId": {
+              "category": "Deploy",
+              "owner": "AWS",
+              "provider": "CloudFormation",
+              "version": "1"
+            },
+            "configuration": {
+              "ActionMode": "CHANGE_SET_EXECUTE",
+              "StackName": "financial-app-dev-infrastructure",
+              "ChangeSetName": "financial-app-dev-changeset"
+            },
+            "roleArn": "arn:aws:iam::177652208709:role/CrossAccountDeploymentRole-dev",
+            "region": "us-east-1",
+            "runOrder": 2
+          }
+        ]
+      },
+      {
+        "name": "ApprovalForTest",
+        "actions": [
+          {
+            "name": "ApproveTestDeployment",
+            "actionTypeId": {
+              "category": "Approval",
+              "owner": "AWS",
+              "provider": "Manual",
+              "version": "1"
+            },
+            "configuration": {
+              "CustomData": "DEV deployment completed successfully. Please verify the application functionality in DEV environment (Account: 177652208709) and approve deployment to TEST environment. Check: 1) Application Load Balancer health, 2) ECS service status, 3) RDS connectivity, 4) Bastion host access."
+            }
+          }
+        ]
+      },
+      {
+        "name": "DeployToTest",
+        "actions": [
+          {
+            "name": "CreateTestChangeSet",
+            "actionTypeId": {
+              "category": "Deploy",
+              "owner": "AWS",
+              "provider": "CloudFormation",
+              "version": "1"
+            },
+            "configuration": {
+              "ActionMode": "CHANGE_SET_REPLACE",
+              "StackName": "financial-app-test-infrastructure",
+              "ChangeSetName": "financial-app-test-changeset",
+              "TemplatePath": "ValidatedOutput::financial-app-infrastructure.yaml",
+              "ParameterOverrides": "{\"Environment\": \"test\", \"ProjectName\": \"financial-app\", \"VpcCidr\": \"10.1.0.0/16\", \"PublicSubnet1Cidr\": \"10.1.1.0/24\", \"PublicSubnet2Cidr\": \"10.1.2.0/24\", \"PrivateSubnet1Cidr\": \"10.1.3.0/24\", \"PrivateSubnet2Cidr\": \"10.1.4.0/24\", \"BastionAllowedCidr\": \"15.248.0.199/32\", \"DatabaseUsername\": \"admin\", \"DatabasePassword\": \"TestPassword123!\", \"DatabaseName\": \"financial_app\", \"DatabaseInstanceClass\": \"db.serverless\", \"ECSTaskCpu\": \"256\", \"ECSTaskMemory\": \"512\", \"FrontendImage\": \"729318851627.dkr.ecr.us-east-1.amazonaws.com/financial-app-frontend:latest\", \"BackendImage\": \"729318851627.dkr.ecr.us-east-1.amazonaws.com/financial-app-backend:latest\", \"KeyPairName\": \"common\"}",
+              "Capabilities": "CAPABILITY_NAMED_IAM",
+              "RoleArn": "arn:aws:iam::729318851627:role/CrossAccountDeploymentRole-test"
+            },
+            "inputArtifacts": [
+              {
+                "name": "ValidatedOutput"
+              }
+            ],
+            "roleArn": "arn:aws:iam::729318851627:role/CrossAccountDeploymentRole-test",
+            "region": "us-east-1"
+          },
+          {
+            "name": "ExecuteTestChangeSet",
+            "actionTypeId": {
+              "category": "Deploy",
+              "owner": "AWS",
+              "provider": "CloudFormation",
+              "version": "1"
+            },
+            "configuration": {
+              "ActionMode": "CHANGE_SET_EXECUTE",
+              "StackName": "financial-app-test-infrastructure",
+              "ChangeSetName": "financial-app-test-changeset"
+            },
+            "roleArn": "arn:aws:iam::729318851627:role/CrossAccountDeploymentRole-test",
+            "region": "us-east-1",
+            "runOrder": 2
+          }
+        ]
+      },
+      {
+        "name": "FinalApproval",
+        "actions": [
+          {
+            "name": "DeploymentComplete",
+            "actionTypeId": {
+              "category": "Approval",
+              "owner": "AWS",
+              "provider": "Manual",
+              "version": "1"
+            },
+            "configuration": {
+              "CustomData": "TEST deployment completed successfully! Please verify the application functionality in TEST environment (Account: 729318851627). Pipeline execution complete. Both DEV and TEST environments are now updated with the latest infrastructure changes."
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
