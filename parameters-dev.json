@@ -65,6 +65,6 @@
   },
   {
     "ParameterKey": "KeyPairName",
-    "ParameterValue": "common"
+    "ParameterValue": "financial-app-keypair"
   }
 ]
