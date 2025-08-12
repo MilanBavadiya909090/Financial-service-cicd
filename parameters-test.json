@@ -9,23 +9,23 @@
   },
   {
     "ParameterKey": "VpcCidr",
-    "ParameterValue": "10.1.0.0/16"
+    "ParameterValue": "10.0.0.0/16"
   },
   {
     "ParameterKey": "PublicSubnet1Cidr",
-    "ParameterValue": "10.1.1.0/24"
+    "ParameterValue": "10.0.1.0/24"
   },
   {
     "ParameterKey": "PublicSubnet2Cidr",
-    "ParameterValue": "10.1.2.0/24"
+    "ParameterValue": "10.0.2.0/24"
   },
   {
     "ParameterKey": "PrivateSubnet1Cidr",
-    "ParameterValue": "10.1.3.0/24"
+    "ParameterValue": "10.0.3.0/24"
   },
   {
     "ParameterKey": "PrivateSubnet2Cidr",
-    "ParameterValue": "10.1.4.0/24"
+    "ParameterValue": "10.0.4.0/24"
   },
   {
     "ParameterKey": "BastionAllowedCidr",
@@ -37,7 +37,7 @@
   },
   {
     "ParameterKey": "DatabasePassword",
-    "ParameterValue": "TestPassword123!"
+    "ParameterValue": "DevPassword123!"
   },
   {
     "ParameterKey": "DatabaseName",
