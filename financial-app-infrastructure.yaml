@@ -34,7 +34,7 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-    AllowedValues: [dev, tes, prod]
+    AllowedValues: [dev, staging, prod]
     Description: Environment name (dev, staging, prod)
     
   ProjectName:
@@ -597,13 +597,13 @@ Resources:
   FrontendLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/ecs/${ProjectName}-${Environment}-frontend-task'
+      LogGroupName: !Sub '/ecs/${ProjectName}-${Environment}-fro-task'
       RetentionInDays: !If [IsProduction, 30, 7]
 
   BackendLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/ecs/${ProjectName}-${Environment}-backend-task'
+      LogGroupName: !Sub '/ecs/${ProjectName}-${Environment}-bac-task'
       RetentionInDays: !If [IsProduction, 30, 7]
 
   # IAM Roles
