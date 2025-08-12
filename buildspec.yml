@@ -1,0 +1,62 @@
+version: 0.2
+
+env:
+  variables:
+    STACK_NAME: "financial-app-infrastructure"
+    TEMPLATE_FILE: "financial-app-infrastructure.yaml"
+    PARAMETER_FILE: "parameters-dev.json"
+
+phases:
+  pre_build:
+    commands:
+      - echo "=== Pre-build Phase ==="
+      - echo "AWS CLI Version:"
+      - aws --version
+      - echo "Assuming cross-account role..."
+      - TEMP_ROLE=$(aws sts assume-role --role-arn arn:aws:iam::177652208709:role/CrossAccountCloudFormationRole --role-session-name codebuild-session)
+      - export AWS_ACCESS_KEY_ID=$(echo $TEMP_ROLE | jq -r .Credentials.AccessKeyId)
+      - export AWS_SECRET_ACCESS_KEY=$(echo $TEMP_ROLE | jq -r .Credentials.SecretAccessKey)
+      - export AWS_SESSION_TOKEN=$(echo $TEMP_ROLE | jq -r .Credentials.SessionToken)
+      - echo "Cross-account role assumed successfully"
+      - echo "Configuration:"
+      - echo "  Stack Name = $STACK_NAME"
+      - echo "  Template File = $TEMPLATE_FILE"
+      - echo "  Parameter File = $PARAMETER_FILE"
+
+  build:
+    commands:
+      - echo "=== Build Phase ==="
+      - echo "Build started on $(date)"
+      - echo "Current directory contents:"
+      - ls -la
+      - echo "Validating template file..."
+      - |
+        if [ -f "$TEMPLATE_FILE" ]; then
+          echo "✓ Template file found: $TEMPLATE_FILE"
+        else
+          echo "✗ Template file not found: $TEMPLATE_FILE"
+          echo "Available files:"
+          find . -name "*.yaml" -o -name "*.yml" -o -name "*.json"
+          exit 1
+        fi
+      - echo "Validating parameter file..."
+      - |
+        if [ -f "$PARAMETER_FILE" ]; then
+          echo "✓ Parameter file found: $PARAMETER_FILE"
+          PARAM_ARGS="--parameter-overrides file://$PARAMETER_FILE"
+        else
+          echo "⚠ Parameter file not found: $PARAMETER_FILE"
+          echo "Deploying without parameters"
+          PARAM_ARGS=""
+        fi
+      - echo "Deploying CloudFormation stack..."
+      - echo "Command: aws cloudformation deploy --template-file $TEMPLATE_FILE --stack-name $STACK_NAME --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region us-east-1 --role-arn arn:aws:iam::177652208709:role/CrossAccountCloudFormationRole $PARAM_ARGS"
+      - aws cloudformation deploy --template-file $TEMPLATE_FILE --stack-name $STACK_NAME --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region us-east-1 --role-arn arn:aws:iam::177652208709:role/CrossAccountCloudFormationRole $PARAM_ARGS
+
+  post_build:
+    commands:
+      - echo "=== Post-build Phase ==="
+      - echo "Build completed on $(date)"
+      - echo "CloudFormation stack '$STACK_NAME' deployment completed successfully"
+      - echo "Stack details:"
+      - aws cloudformation describe-stacks --stack-name $STACK_NAME --region us-east-1 --query 'Stacks[0].{StackName:StackName,Status:StackStatus,CreationTime:CreationTime}' --output table
