@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Three-tier Financial Web Application Infrastructure - VPC, ECS, RDS Aurora, ALB, and Bastion Host'
+Description: 'Three-tier Financial Web Application Infrastructure - VPC, ECS Cluster, RDS Aurora, ALB, and Bastion Host'
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -25,13 +25,6 @@ Metadata:
           - DatabasePassword
           - DatabaseName
           - DatabaseInstanceClass
-      - Label:
-          default: "ECS Configuration"
-        Parameters:
-          - ECSTaskCpu
-          - ECSTaskMemory
-          - FrontendImage
-          - BackendImage
       - Label:
           default: "Security Configuration"
         Parameters:
@@ -102,26 +95,6 @@ Parameters:
     Default: db.serverless
     AllowedValues: [db.serverless, db.t3.medium, db.t3.large]
     Description: Database instance class
-    
-  ECSTaskCpu:
-    Type: String
-    Default: '256'
-    AllowedValues: ['256', '512', '1024', '2048']
-    Description: ECS Task CPU units
-    
-  ECSTaskMemory:
-    Type: String
-    Default: '512'
-    AllowedValues: ['512', '1024', '2048', '4096']
-    Description: ECS Task Memory (MB)
-    
-  FrontendImage:
-    Type: String
-    Description: Frontend Docker image URI (ECR repository URI)
-    
-  BackendImage:
-    Type: String
-    Description: Backend Docker image URI (ECR repository URI)
     
   KeyPairName:
     Type: AWS::EC2::KeyPair::KeyName
@@ -679,131 +652,6 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-  # ECS Task Definitions
-  FrontendTaskDefinition:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      Family: !Sub '${ProjectName}-${Environment}-frontend-task'
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Cpu: !Ref ECSTaskCpu
-      Memory: !Ref ECSTaskMemory
-      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
-      ContainerDefinitions:
-        - Name: !Sub '${ProjectName}-frontend'
-          Image: !Ref FrontendImage
-          PortMappings:
-            - Name: frontend-port
-              ContainerPort: 80
-              Protocol: tcp
-          Essential: true
-          Environment:
-            - Name: REACT_APP_API_URL
-              Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}:8000'
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref FrontendLogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
-      Tags:
-        - Key: Name
-          Value: !Sub '${ProjectName}-${Environment}-frontend-task'
-        - Key: Environment
-          Value: !Ref Environment
-
-  BackendTaskDefinition:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      Family: !Sub '${ProjectName}-${Environment}-backend-task'
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Cpu: !Ref ECSTaskCpu
-      Memory: !Ref ECSTaskMemory
-      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
-      TaskRoleArn: !GetAtt ECSTaskRole.Arn
-      ContainerDefinitions:
-        - Name: !Sub '${ProjectName}-backend'
-          Image: !Ref BackendImage
-          PortMappings:
-            - Name: backend-port
-              ContainerPort: 8000
-              Protocol: tcp
-          Essential: true
-          Environment:
-            - Name: AWS_DEFAULT_REGION
-              Value: !Ref AWS::Region
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref BackendLogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
-      Tags:
-        - Key: Name
-          Value: !Sub '${ProjectName}-${Environment}-backend-task'
-        - Key: Environment
-          Value: !Ref Environment
-
-  # ECS Services
-  FrontendService:
-    Type: AWS::ECS::Service
-    DependsOn: FrontendListener
-    Properties:
-      ServiceName: !Sub '${ProjectName}-${Environment}-frontend-service'
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref FrontendTaskDefinition
-      DesiredCount: !If [IsProduction, 2, 1]
-      LaunchType: FARGATE
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-          Subnets:
-            - !Ref PublicSubnet1
-            - !Ref PublicSubnet2
-      LoadBalancers:
-        - ContainerName: !Sub '${ProjectName}-frontend'
-          ContainerPort: 80
-          TargetGroupArn: !Ref FrontendTargetGroup
-      HealthCheckGracePeriodSeconds: 60
-      Tags:
-        - Key: Name
-          Value: !Sub '${ProjectName}-${Environment}-frontend-service'
-        - Key: Environment
-          Value: !Ref Environment
-
-  BackendService:
-    Type: AWS::ECS::Service
-    DependsOn: BackendListener
-    Properties:
-      ServiceName: !Sub '${ProjectName}-${Environment}-backend-service'
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref BackendTaskDefinition
-      DesiredCount: !If [IsProduction, 2, 1]
-      LaunchType: FARGATE
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-          Subnets:
-            - !Ref PublicSubnet1
-            - !Ref PublicSubnet2
-      LoadBalancers:
-        - ContainerName: !Sub '${ProjectName}-backend'
-          ContainerPort: 8000
-          TargetGroupArn: !Ref BackendTargetGroup
-      HealthCheckGracePeriodSeconds: 60
-      Tags:
-        - Key: Name
-          Value: !Sub '${ProjectName}-${Environment}-backend-service'
-        - Key: Environment
-          Value: !Ref Environment
-
   # Bastion Host
   BastionHostLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
@@ -882,13 +730,23 @@ Outputs:
     Export:
       Name: !Sub '${ProjectName}-${Environment}-alb-dns'
 
-  FrontendURL:
-    Description: Frontend application URL
-    Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}'
+  ApplicationLoadBalancerArn:
+    Description: Application Load Balancer ARN
+    Value: !Ref ApplicationLoadBalancer
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-alb-arn'
 
-  BackendURL:
-    Description: Backend API URL
-    Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}:8000'
+  FrontendTargetGroupArn:
+    Description: Frontend target group ARN
+    Value: !Ref FrontendTargetGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-frontend-tg-arn'
+
+  BackendTargetGroupArn:
+    Description: Backend target group ARN
+    Value: !Ref BackendTargetGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-backend-tg-arn'
 
   DatabaseEndpoint:
     Description: RDS Aurora cluster endpoint
@@ -916,6 +774,24 @@ Outputs:
     Export:
       Name: !Sub '${ProjectName}-${Environment}-ecs-cluster'
 
+  ECSClusterArn:
+    Description: ECS cluster ARN
+    Value: !GetAtt ECSCluster.Arn
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-ecs-cluster-arn'
+
+  ECSTaskExecutionRoleArn:
+    Description: ECS task execution role ARN
+    Value: !GetAtt ECSTaskExecutionRole.Arn
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-ecs-execution-role-arn'
+
+  ECSTaskRoleArn:
+    Description: ECS task role ARN
+    Value: !GetAtt ECSTaskRole.Arn
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-ecs-task-role-arn'
+
   SecurityGroups:
     Description: Security group information
     Value: !Sub |
@@ -923,3 +799,21 @@ Outputs:
       ECS Security Group: ${ECSSecurityGroup}
       Database Security Group: ${DatabaseSecurityGroup}
       Bastion Security Group: ${BastionSecurityGroup}
+
+  ECSSecurityGroupId:
+    Description: ECS security group ID
+    Value: !Ref ECSSecurityGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-ecs-sg-id'
+
+  FrontendLogGroupName:
+    Description: Frontend CloudWatch log group name
+    Value: !Ref FrontendLogGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-frontend-log-group'
+
+  BackendLogGroupName:
+    Description: Backend CloudWatch log group name
+    Value: !Ref BackendLogGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-backend-log-group'
