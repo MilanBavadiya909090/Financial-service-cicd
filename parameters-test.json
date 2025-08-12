@@ -4,28 +4,28 @@
     "ParameterValue": "staging"
   },
   {
-    "ParameterKey": "ProjectName",
+    "ParameterKey": "ProjectName", 
     "ParameterValue": "financial-app"
   },
   {
     "ParameterKey": "VpcCidr",
-    "ParameterValue": "10.0.0.0/16"
+    "ParameterValue": "10.1.0.0/16"
   },
   {
     "ParameterKey": "PublicSubnet1Cidr",
-    "ParameterValue": "10.0.1.0/24"
+    "ParameterValue": "10.1.1.0/24"
   },
   {
-    "ParameterKey": "PublicSubnet2Cidr",
-    "ParameterValue": "10.0.2.0/24"
+    "ParameterKey": "PublicSubnet2Cidr", 
+    "ParameterValue": "10.1.2.0/24"
   },
   {
     "ParameterKey": "PrivateSubnet1Cidr",
-    "ParameterValue": "10.0.3.0/24"
+    "ParameterValue": "10.1.3.0/24"
   },
   {
     "ParameterKey": "PrivateSubnet2Cidr",
-    "ParameterValue": "10.0.4.0/24"
+    "ParameterValue": "10.1.4.0/24"
   },
   {
     "ParameterKey": "BastionAllowedCidr",
@@ -37,11 +37,11 @@
   },
   {
     "ParameterKey": "DatabasePassword",
-    "ParameterValue": "DevPassword123!"
+    "ParameterValue": "StagingPassword123!"
   },
   {
     "ParameterKey": "DatabaseName",
-    "ParameterValue": "financial_app"
+    "ParameterValue": "financial_app_staging"
   },
   {
     "ParameterKey": "DatabaseInstanceClass",
