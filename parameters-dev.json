@@ -48,22 +48,6 @@
     "ParameterValue": "db.serverless"
   },
   {
-    "ParameterKey": "ECSTaskCpu",
-    "ParameterValue": "256"
-  },
-  {
-    "ParameterKey": "ECSTaskMemory",
-    "ParameterValue": "512"
-  },
-  {
-    "ParameterKey": "FrontendImage",
-    "ParameterValue": "586794441541.dkr.ecr.us-east-1.amazonaws.com/financial-app-frontend:latest"
-  },
-  {
-    "ParameterKey": "BackendImage",
-    "ParameterValue": "586794441541.dkr.ecr.us-east-1.amazonaws.com/financial-app-backend:latest"
-  },
-  {
     "ParameterKey": "KeyPairName",
     "ParameterValue": "financial-app-keypair"
   }
