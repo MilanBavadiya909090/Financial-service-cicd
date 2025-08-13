@@ -705,6 +705,102 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  # ECS Task Definitions
+  FrontendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${ProjectName}-${Environment}-frontend'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: frontend
+          Image: !Sub '455861466554.dkr.ecr.us-east-1.amazonaws.com/financial-app-frontend:latest'
+          PortMappings:
+            - ContainerPort: 80
+              Protocol: tcp
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref FrontendLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          Environment:
+            - Name: NODE_ENV
+              Value: !Ref Environment
+            - Name: API_URL
+              Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}/api'
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - 'curl -f http://localhost:80/ || exit 1'
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-frontend-task'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${ProjectName}-${Environment}-backend'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: 512
+      Memory: 1024
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: backend
+          Image: !Sub '455861466554.dkr.ecr.us-east-1.amazonaws.com/financial-app-backend:latest'
+          PortMappings:
+            - ContainerPort: 8000
+              Protocol: tcp
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref BackendLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          Environment:
+            - Name: NODE_ENV
+              Value: !Ref Environment
+            - Name: DB_HOST
+              Value: !GetAtt DatabaseCluster.Endpoint.Address
+            - Name: DB_PORT
+              Value: '3306'
+            - Name: DB_NAME
+              Value: !Ref DatabaseName
+            - Name: DB_USER
+              Value: !Ref DatabaseUsername
+          Secrets:
+            - Name: DB_PASSWORD
+              ValueFrom: !Ref DatabaseSecret
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - 'curl -f http://localhost:8000/health || exit 1'
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-backend-task'
+        - Key: Environment
+          Value: !Ref Environment
+
 Outputs:
   VPCId:
     Description: VPC ID
@@ -817,3 +913,15 @@ Outputs:
     Value: !Ref BackendLogGroup
     Export:
       Name: !Sub '${ProjectName}-${Environment}-backend-log-group'
+
+  FrontendTaskDefinitionArn:
+    Description: Frontend ECS task definition ARN
+    Value: !Ref FrontendTaskDefinition
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-frontend-task-definition-arn'
+
+  BackendTaskDefinitionArn:
+    Description: Backend ECS task definition ARN
+    Value: !Ref BackendTaskDefinition
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-backend-task-definition-arn'
