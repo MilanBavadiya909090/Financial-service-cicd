@@ -34,8 +34,8 @@ Parameters:
   Environment:
     Type: String
     Default: dev
-    AllowedValues: [dev, staging, prod]
-    Description: Environment name (dev, staging, prod)
+    AllowedValues: [dev, test, prod]
+    Description: Environment name (dev, test, prod)
     
   ProjectName:
     Type: String
