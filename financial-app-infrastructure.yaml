@@ -801,6 +801,226 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  # Additional Target Groups for Blue-Green Deployment
+  FrontendTargetGroupBlue:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-frontend-tg-blue'
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      TargetType: ip
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-frontend-tg-blue'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendTargetGroupBlue:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-backend-tg-blue'
+      Port: 8000
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      TargetType: ip
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-backend-tg-blue'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CodeDeploy Service Role
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${Environment}-codedeploy-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodeDeployRoleForECS
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-codedeploy-role'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CodeDeploy Applications
+  FrontendCodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub '${ProjectName}-${Environment}-frontend'
+      ComputePlatform: ECS
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-frontend-codedeploy'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendCodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub '${ProjectName}-${Environment}-backend'
+      ComputePlatform: ECS
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-backend-codedeploy'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CodeDeploy Deployment Groups
+  FrontendDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref FrontendCodeDeployApplication
+      DeploymentGroupName: !Sub '${ProjectName}-${Environment}-frontend-dg'
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+      DeploymentConfigName: CodeDeployDefault.ECSAllAtOnceBlueGreen
+      BlueGreenDeploymentConfiguration:
+        TerminateBlueInstancesOnDeploymentSuccess:
+          Action: TERMINATE
+          TerminationWaitTimeInMinutes: 5
+        DeploymentReadyOption:
+          ActionOnTimeout: CONTINUE_DEPLOYMENT
+        GreenFleetProvisioningOption:
+          Action: COPY_AUTO_SCALING_GROUP
+      LoadBalancerInfo:
+        TargetGroupPairInfoList:
+          - ProdTrafficRoute:
+              ListenerArns:
+                - !Ref FrontendListener
+            TargetGroups:
+              - Name: !GetAtt FrontendTargetGroup.TargetGroupName
+              - Name: !GetAtt FrontendTargetGroupBlue.TargetGroupName
+      ECSServices:
+        - ServiceName: !GetAtt FrontendService.Name
+          ClusterName: !Ref ECSCluster
+      AutoRollbackConfiguration:
+        Enabled: true
+        Events:
+          - DEPLOYMENT_FAILURE
+          - DEPLOYMENT_STOP_ON_ALARM
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-frontend-dg'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref BackendCodeDeployApplication
+      DeploymentGroupName: !Sub '${ProjectName}-${Environment}-backend-dg'
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+      DeploymentConfigName: CodeDeployDefault.ECSAllAtOnceBlueGreen
+      BlueGreenDeploymentConfiguration:
+        TerminateBlueInstancesOnDeploymentSuccess:
+          Action: TERMINATE
+          TerminationWaitTimeInMinutes: 5
+        DeploymentReadyOption:
+          ActionOnTimeout: CONTINUE_DEPLOYMENT
+        GreenFleetProvisioningOption:
+          Action: COPY_AUTO_SCALING_GROUP
+      LoadBalancerInfo:
+        TargetGroupPairInfoList:
+          - ProdTrafficRoute:
+              ListenerArns:
+                - !Ref BackendListener
+            TargetGroups:
+              - Name: !GetAtt BackendTargetGroup.TargetGroupName
+              - Name: !GetAtt BackendTargetGroupBlue.TargetGroupName
+      ECSServices:
+        - ServiceName: !GetAtt BackendService.Name
+          ClusterName: !Ref ECSCluster
+      AutoRollbackConfiguration:
+        Enabled: true
+        Events:
+          - DEPLOYMENT_FAILURE
+          - DEPLOYMENT_STOP_ON_ALARM
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-backend-dg'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ECS Services with CodeDeploy Controller
+  FrontendService:
+    Type: AWS::ECS::Service
+    DependsOn: FrontendListener
+    Properties:
+      ServiceName: !Sub '${ProjectName}-${Environment}-frontend-service'
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref FrontendTaskDefinition
+      DesiredCount: 2
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+      LoadBalancers:
+        - ContainerName: frontend
+          ContainerPort: 80
+          TargetGroupArn: !Ref FrontendTargetGroup
+      DeploymentController:
+        Type: CODE_DEPLOY
+      HealthCheckGracePeriodSeconds: 300
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-frontend-service'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BackendService:
+    Type: AWS::ECS::Service
+    DependsOn: BackendListener
+    Properties:
+      ServiceName: !Sub '${ProjectName}-${Environment}-backend-service'
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref BackendTaskDefinition
+      DesiredCount: 2
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+      LoadBalancers:
+        - ContainerName: backend
+          ContainerPort: 8000
+          TargetGroupArn: !Ref BackendTargetGroup
+      DeploymentController:
+        Type: CODE_DEPLOY
+      HealthCheckGracePeriodSeconds: 300
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-backend-service'
+        - Key: Environment
+          Value: !Ref Environment
+
 Outputs:
   VPCId:
     Description: VPC ID
@@ -925,3 +1145,55 @@ Outputs:
     Value: !Ref BackendTaskDefinition
     Export:
       Name: !Sub '${ProjectName}-${Environment}-backend-task-definition-arn'
+
+  # ECS Services
+  FrontendServiceArn:
+    Description: Frontend ECS service ARN
+    Value: !Ref FrontendService
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-frontend-service-arn'
+
+  BackendServiceArn:
+    Description: Backend ECS service ARN
+    Value: !Ref BackendService
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-backend-service-arn'
+
+  # CodeDeploy Applications
+  FrontendCodeDeployApplicationName:
+    Description: Frontend CodeDeploy application name
+    Value: !Ref FrontendCodeDeployApplication
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-frontend-codedeploy-app'
+
+  BackendCodeDeployApplicationName:
+    Description: Backend CodeDeploy application name
+    Value: !Ref BackendCodeDeployApplication
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-backend-codedeploy-app'
+
+  # CodeDeploy Deployment Groups
+  FrontendDeploymentGroupName:
+    Description: Frontend CodeDeploy deployment group name
+    Value: !Ref FrontendDeploymentGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-frontend-deployment-group'
+
+  BackendDeploymentGroupName:
+    Description: Backend CodeDeploy deployment group name
+    Value: !Ref BackendDeploymentGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-backend-deployment-group'
+
+  # Blue Target Groups
+  FrontendTargetGroupBlueArn:
+    Description: Frontend blue target group ARN
+    Value: !Ref FrontendTargetGroupBlue
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-frontend-tg-blue-arn'
+
+  BackendTargetGroupBlueArn:
+    Description: Backend blue target group ARN
+    Value: !Ref BackendTargetGroupBlue
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-backend-tg-blue-arn'
