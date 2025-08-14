@@ -449,7 +449,9 @@ Resources:
       Engine: aurora-mysql
       EngineVersion: '8.0.mysql_aurora.3.08.2'
       MasterUsername: !Ref DatabaseUsername
-      MasterUserPassword: !Ref DatabasePassword
+      ManageMasterUserPassword: true
+      MasterUserSecret:
+        SecretArn: !Ref DatabaseSecret
       DatabaseName: !Ref DatabaseName
       DBSubnetGroupName: !Ref DatabaseSubnetGroup
       VpcSecurityGroupIds:
@@ -774,6 +776,8 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
           Environment:
+            - Name: ENVIRONMENT
+              Value: !Ref Environment
             - Name: NODE_ENV
               Value: !Ref Environment
             - Name: DB_HOST
@@ -809,82 +813,7 @@ Resources:
 
 
 
-  # ECS Services with Standard ECS Controller for Blue/Green Deployment
-  FrontendService:
-    Type: AWS::ECS::Service
-    DependsOn: FrontendListener
-    Properties:
-      ServiceName: !Sub '${ProjectName}-${Environment}-frontend-service'
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref FrontendTaskDefinition
-      DesiredCount: 1
-      LaunchType: FARGATE
-      PlatformVersion: LATEST
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-          Subnets:
-            - !Ref PublicSubnet1
-            - !Ref PublicSubnet2
-      LoadBalancers:
-        - ContainerName: frontend
-          ContainerPort: 80
-          TargetGroupArn: !Ref FrontendTargetGroup
-      DeploymentController:
-        Type: ECS
-      DeploymentConfiguration:
-        MaximumPercent: 200
-        MinimumHealthyPercent: 50
-        DeploymentCircuitBreaker:
-          Enable: true
-          Rollback: true
-      HealthCheckGracePeriodSeconds: 300
-      EnableExecuteCommand: true
-      Tags:
-        - Key: Name
-          Value: !Sub '${ProjectName}-${Environment}-frontend-service'
-        - Key: Environment
-          Value: !Ref Environment
 
-  BackendService:
-    Type: AWS::ECS::Service
-    DependsOn: BackendListener
-    Properties:
-      ServiceName: !Sub '${ProjectName}-${Environment}-backend-service'
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref BackendTaskDefinition
-      DesiredCount: 1
-      LaunchType: FARGATE
-      PlatformVersion: LATEST
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-          Subnets:
-            - !Ref PublicSubnet1
-            - !Ref PublicSubnet2
-      LoadBalancers:
-        - ContainerName: backend
-          ContainerPort: 8000
-          TargetGroupArn: !Ref BackendTargetGroup
-      DeploymentController:
-        Type: ECS
-      DeploymentConfiguration:
-        MaximumPercent: 200
-        MinimumHealthyPercent: 50
-        DeploymentCircuitBreaker:
-          Enable: true
-          Rollback: true
-      HealthCheckGracePeriodSeconds: 300
-      EnableExecuteCommand: true
-      Tags:
-        - Key: Name
-          Value: !Sub '${ProjectName}-${Environment}-backend-service'
-        - Key: Environment
-          Value: !Ref Environment
 
 Outputs:
   VPCId:
@@ -1010,19 +939,3 @@ Outputs:
     Value: !Ref BackendTaskDefinition
     Export:
       Name: !Sub '${ProjectName}-${Environment}-backend-task-definition-arn'
-
-  # ECS Services
-  FrontendServiceArn:
-    Description: Frontend ECS service ARN
-    Value: !Ref FrontendService
-    Export:
-      Name: !Sub '${ProjectName}-${Environment}-frontend-service-arn'
-
-  BackendServiceArn:
-    Description: Backend ECS service ARN
-    Value: !Ref BackendService
-    Export:
-      Name: !Sub '${ProjectName}-${Environment}-backend-service-arn'
-
-
-
